@@ -1,71 +1,75 @@
-import gym as openai
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import tensorflow as tf
-numeric_feature = tf.feature_column.numeric_column
+
+import envs
+import approximators
+
+create_env = envs.nchain_nonslip
+create_vfun = approximators.MyApproximator
 
 
-def create_qfun(observation_shape):
-    # Three hidden layers with 128 neurons. Separate network for each action.
-    qnetwork_shape = [128, 128, 128]
-
-    feature_info = [
-        numeric_feature(
-            key='observation',
-            shape=observation_shape,
-        )]
-    qfun = tf.estimator.DNNRegressor(
-        feature_columns=feature_info,
-        hidden_units=qnetwork_shape,
-        dropout=0.25, # NOTE
-        )
-    return qfun
+def policy_thompson(vfuns):
+    def _(observation):
+        return np.argmax([v.predict([observation], dropout=True) for v in vfuns])
+    return _
 
 
-def train(estimator, observations, rewards):
-    estimator.train(lambda: tf.data.Dataset.from_tensors(
-        ({'observation': observations}, rewards)
-        ))
+def rollout(env, policy):
+    # Rollout a single episode
+    experience = []
+    terminated = False
+    observation = env.reset()
+    while not terminated:
+        action = policy(observation)
+        new_observation, reward, terminated, _ = env.step(action)
+        experience.append((observation, action, reward, new_observation))
+        observation = new_observation
+    return experience
 
 
-def predict(estimator, observations):
-    return [*estimator.train(lambda: tf.data.Dataset.from_tensors(
-        {'observation': observations}
-        ))]
+def learn(vfuns, experience):
+    os = [[] for _ in vfuns]
+    rs = [[] for _ in vfuns]
+    ps = [[] for _ in vfuns]
+    for o,a,r,p in experience:
+        os[a].append(o)
+        rs[a].append(r)
+        ps[a].append(p)
+    for a, vfun in enumerate(vfuns):
+        osa = np.array(os[a])
+        rsa = np.array(rs[a])
+        psa = np.array(ps[a])
+        d = 0.9 # discount
+        # FIXME: this dropout should be false
+        vfun.learn(osa, rsa + d*vfun.predict(psa, dropout=True))
 
 
-def create_env():
-    # Non-slip NChain
-    env = openai.make('NChain-v0')
-    env.unwrapped.slip = 0
-    return env
-
-
-def thompson_action(qfuns, observation):
-    return np.argmax([predict(qfun, [observation])[0] for qfun in qfuns])
 
 
 def main():
-    with tf.Session():
-        env = create_env()
-        action_count = env.action_space.n
-        qfuns = [create_qfun() for _ in range(action_count)]
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.gca()
+    env = create_env()
+    action_count = env.action_space.n
+    vfuns = [create_vfun() for _ in range(action_count)]
+    with tf.Session() as sess, sess.as_default():
+        sess.run(tf.global_variables_initializer())
 
         # Interaction loop
-        while True:
-            observations = [[] for _ in range(action_count)]
-            rewards = [[] for _ in range(action_count)]
-
-            # Run an episode
-            observation = env.reset()
-            episode_finished = False
-            while not episode_finished:
-                action = thompson_action(qfuns, observation)
-                observations[action].append(observation)
-                observation, reward, episode_finished, _ = env.step(action)
-                rewards[action].append(reward)
-
-            # Train qfuns
-            for qf, acts, rews in zip(qfuns, observation, rewards):
-                train(qf, acts, rews)
+        for i in range(10000):
+            experience = rollout(env, policy_thompson(vfuns))
+            learn(vfuns, experience)
+            if i % 1 == 0:
+                reward_sum = sum(x[1] for x in experience)
+                print(f"{i}: reward sum {reward_sum}")
+                distributions = {a: vfun.predict([0]*100000, dropout=True) for a, vfun in enumerate(vfuns)}
+                ax.clear()
+                pd.DataFrame( distributions ).plot.hist(ax=ax, histtype='step', density=True, bins=100, alpha=0.8)
+                fig.tight_layout()
+                fig.canvas.draw()
 
 
 if __name__ == '__main__':
