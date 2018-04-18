@@ -42,8 +42,7 @@ def learn(vfuns, experience):
         rsa = np.array(rs[a])
         psa = np.array(ps[a])
         d = 0.9 # discount
-        # FIXME: this dropout should be false
-        vfun.learn(osa, rsa + d*vfun.predict(psa, dropout=True))
+        vfun.learn(osa, rsa + d*vfun.predict(psa, dropout=False))
 
 
 
