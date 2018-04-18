@@ -11,8 +11,8 @@ create_vfun = approximators.MyApproximator
 
 
 def policy_thompson(vfuns):
-    def _(observation):
-        return np.argmax([v.predict([observation], dropout=True) for v in vfuns])
+    def _(observations):
+        return np.argmax([v.predict(observations, dropout=True) for v in vfuns], axis=-1)
     return _
 
 
@@ -22,7 +22,7 @@ def rollout(env, policy):
     terminated = False
     observation = env.reset()
     while not terminated:
-        action = policy(observation)
+        action = policy([observation])[0]
         new_observation, reward, terminated, _ = env.step(action)
         experience.append((observation, action, reward, new_observation))
         observation = new_observation
