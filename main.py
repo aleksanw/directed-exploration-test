@@ -2,13 +2,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import collections
+import logging
+import contextlib
 
 import envs
 import approximators
 
+TD_Step = collections.namedtuple('TD_Step', [
+    'observation', 'action', 'reward', 'next_observation'
+    ])
+
 create_env = envs.nchain_nonslip
 create_vfun = approximators.MyApproximator
 
+log = logging.getLogger(__name__)
 
 def policy_thompson(vfuns):
     def _(observations):
@@ -16,59 +24,192 @@ def policy_thompson(vfuns):
     return _
 
 
-def rollout(env, policy):
-    # Rollout a single episode
-    experience = []
-    terminated = False
-    observation = env.reset()
-    while not terminated:
-        action = policy([observation])[0]
+def continous_rollout(env, output):
+    assert False
+    terminated = True
+    while True:
+        if terminated:
+            observation = env.reset()
+        action = yield observation
         new_observation, reward, terminated, _ = env.step(action)
-        experience.append((observation, action, reward, new_observation))
+        output((observation, action, reward, new_observation))
         observation = new_observation
-    return experience
+
+
+def bundle_envrolls(envrolls):
+    assert False
+    actions = [None] * len(envrolls)
+    while True:
+        observations = [e.send(a) for e,a in zip(envrolls, actions)]
+        actions = yield observations
+
+
+class InteractionEngine:
+    def __init__(self, create_env, policy):
+        assert False
+        self.policy = policy
+        self._env_bundle = bundle_envrolls([create_env() for _ in range(1000)])
+
+    def generate_experience(self):
+        observations = next(self._env_bundle)
+        observations = self._env_bundle.send(policy(observations))
+        yield from asd
+
+
+def rollout_engine(policy):
+    assert False
+    while True:
+        new_policy = yield experience
+        if new_policy is not None:
+            policy = new_policy
+            continue
+
+        experience = []
+        rollout(env, experience.append)
 
 
 def learn(vfuns, experience):
-    os = [[] for _ in vfuns]
-    rs = [[] for _ in vfuns]
-    ps = [[] for _ in vfuns]
-    for o,a,r,p in experience:
-        os[a].append(o)
-        rs[a].append(r)
-        ps[a].append(p)
-    for a, vfun in enumerate(vfuns):
-        osa = np.array(os[a])
-        rsa = np.array(rs[a])
-        psa = np.array(ps[a])
-        d = 0.9 # discount
-        vfun.learn(osa, rsa + d*vfun.predict(psa, dropout=False))
+    observations = [[] for _ in vfuns]
+    rewards = [[] for _ in vfuns]
+    next_observations = [[] for _ in vfuns]
+
+    # Bucketize experience on action
+    for o,action,r,p in experience:
+        observations[action].append(o)
+        rewards[action].append(r)
+        next_observations[action].append(p)
+
+    # Each action has its own estimator, train each separatly
+    for action, action_vfun in enumerate(vfuns):
+        # Convert to numpy arrays
+        observations = np.array(observations[action], ndmin=1)
+        rewards = np.array(rewards[action], ndmin=1)
+        next_observations = np.array(next_observations[action], ndmin=1)
+
+        # Learn a TD0 step
+        td_discount = 1
+        next_predictions = action_vfun.predict(next_observations, dropout=False)
+        td_targets = rewards + td_discount * next_predictions
+        action_vfun.learn(observations, td_targets)
+        # Note: The learning rate is set in AdamOptimizer used in approximators.py
 
 
+class ReplayBuffer(collections.deque):
+    """Stores oaro-tuples. This in essence creates a transition model that will
+    be sampled for learning."""
+
+    def __init__(self, size):
+        super().__init__(self, maxlen=size)
+
+    @property
+    def seeded(self):
+        return len(self) == self.maxlen
+
+    def sample(self, sample_size):
+        return random.choices(self, k=sample_size)
+
+
+class DistributionPlot:
+    def __init__(self, title):
+        self.title = title
+        self.fig = plt.figure()
+        self.fig.show()
+        plt.pause(0.0001)
+
+    def update(self, data):
+        """
+        Args:
+            data: {label: [value]}, label: str, value: num
+        """
+        df = pd.DataFrame(data)
+
+        ax = self.fig.gca()
+        ax.clear()
+        ax.set_title(self.title)
+        df.plot.hist(ax=ax, histtype='step', density=True, bins=100, alpha=0.8)
+        self.fig.tight_layout()
+        plt.pause(0.0001)
+
+
+@contextlib.contextmanager
+def InitializedTFSession():
+    """
+    Context for a tensorflow session that is initalized and installed as
+    default.
+    """
+    with tf.Session() as sess, sess.as_default():
+        log.info("Starting new tf-session with graph variables reset.")
+        sess.run(tf.global_variables_initializer())
+        yield sess
+
+
+class MultiheadDQN:
+    """
+    Multihead DQN on default tf-graph. Should be instantiated before starting a
+    tf-session. The observations are categorical/discrete.
+    """
+    def __init__(self):
+        assert False
+        self._observations = tf.placeholder(tf.float32, shape=[None])
+        self._dropout_enabled = tf.placeholder(tf.bool)
+        head = self._observations
+        # Network from double-uncertain paper. Separate network for each
+        # action. Three dense relu layers of 128. Dropout with p-keep=75%
+        # enabled during prediction.
+        head = tf.reshape(head, [-1, 1])
+        for _ in range(3):
+            head = tf.layers.dense(head, 128)
+            # Parameter `training` determines if dropout is enabled.
+            head = tf.layers.dropout(head, rate=0.25, training=self._dropout_enabled)
+        head = tf.layers.dense(head, 1)
+        head = tf.reshape(head, [-1])
+        self._value_predictions = head
+
+        self._value_targets = tf.placeholder(tf.float32, shape=[None])
+        self._learn_op = tf.train.AdamOptimizer().minimize(
+            tf.losses.mean_squared_error(self._value_targets, self._value_predictions)
+            )
+
+
+def rollout(env, policy):
+    observation = env.reset()
+    terminated = False
+    while not terminated:
+        action = policy([observation])[0]
+        new_observation, reward, terminated, _ = env.step(action)
+        yield TD_Step(observation, action, reward, new_observation)
+        observation = new_observation
+
+
+def run():
+    # Live plot for debugging
+    plot_o0 = DistributionPlot("State 0")
+    plot_o4 = DistributionPlot("State 4")
+
+    env = create_env()
+    replay_buffer = ReplayBuffer(30000)
+    vfuns = [create_vfun() for _ in range(env.action_space.n)]
+
+    with InitializedTFSession() as sess:
+        for i in range(10000):
+            while True:
+                experience = [*rollout(env, policy_thompson(vfuns))]
+                replay_buffer.extend(experience)
+                if replay_buffer.seeded:
+                    break
+                else:
+                    print(f"Filling buffer: {len(replay_buffer)}")
+            learn(vfuns, experience)
+            if i % 1 == 0:
+                reward_sum = sum(x.reward for x in experience)
+                print(f"{i}: reward sum {reward_sum}")
+                plot_o0.update({a: vfun.predict([0]*100000, dropout=True) for a, vfun in enumerate(vfuns)})
+                plot_o4.update({a: vfun.predict([4]*100000, dropout=True) for a, vfun in enumerate(vfuns)})
 
 
 def main():
-    plt.ion()
-    fig = plt.figure()
-    ax = fig.gca()
-    env = create_env()
-    action_count = env.action_space.n
-    vfuns = [create_vfun() for _ in range(action_count)]
-    with tf.Session() as sess, sess.as_default():
-        sess.run(tf.global_variables_initializer())
-
-        # Interaction loop
-        for i in range(10000):
-            experience = rollout(env, policy_thompson(vfuns))
-            learn(vfuns, experience)
-            if i % 1 == 0:
-                reward_sum = sum(x[1] for x in experience)
-                print(f"{i}: reward sum {reward_sum}")
-                distributions = {a: vfun.predict([0]*100000, dropout=True) for a, vfun in enumerate(vfuns)}
-                ax.clear()
-                pd.DataFrame( distributions ).plot.hist(ax=ax, histtype='step', density=True, bins=100, alpha=0.8)
-                fig.tight_layout()
-                fig.canvas.draw()
+    logging.basicConfig(level=logging.DEBUG)
+    run()
 
 
 if __name__ == '__main__':

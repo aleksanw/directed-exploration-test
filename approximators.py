@@ -22,8 +22,10 @@ class MyApproximator:
         self._value_predictions = head
 
         self._value_targets = tf.placeholder(tf.float32, shape=[None])
-        self._learn_op = tf.train.AdamOptimizer().minimize(
-            tf.losses.mean_squared_error(self._value_targets, self._value_predictions)
+        self._learn_op = tf.train.AdamOptimizer(
+                learning_rate=0.0001
+            ).minimize(
+                tf.losses.mean_squared_error(self._value_targets, self._value_predictions)
             )
 
     def learn(self, observations, values):
