@@ -5,9 +5,13 @@ import tensorflow as tf
 import collections
 import logging
 import contextlib
+import warnings
+import collections
+import coloredlogs
 
 import envs
 import approximators
+from replay_buffer import ReplayBuffer
 
 TD_Step = collections.namedtuple('TD_Step', [
     'observation', 'action', 'reward', 'next_observation'
@@ -94,21 +98,6 @@ def learn(vfuns, experience):
         # Note: The learning rate is set in AdamOptimizer used in approximators.py
 
 
-class ReplayBuffer(collections.deque):
-    """Stores oaro-tuples. This in essence creates a transition model that will
-    be sampled for learning."""
-
-    def __init__(self, size):
-        super().__init__(self, maxlen=size)
-
-    @property
-    def seeded(self):
-        return len(self) == self.maxlen
-
-    def sample(self, sample_size):
-        return random.choices(self, k=sample_size)
-
-
 class DistributionPlot:
     def __init__(self, title):
         self.title = title
@@ -138,7 +127,7 @@ def InitializedTFSession():
     default.
     """
     with tf.Session() as sess, sess.as_default():
-        log.info("Starting new tf-session with graph variables reset.")
+        log.debug("Starting new tf-session with graph variables reset.")
         sess.run(tf.global_variables_initializer())
         yield sess
 
@@ -182,10 +171,6 @@ def rollout(env, policy):
 
 
 def run():
-    # Live plot for debugging
-    plot_o0 = DistributionPlot("State 0")
-    plot_o4 = DistributionPlot("State 4")
-
     env = create_env()
     replay_buffer = ReplayBuffer(30000)
     vfuns = [create_vfun() for _ in range(env.action_space.n)]
@@ -198,18 +183,27 @@ def run():
                 if replay_buffer.seeded:
                     break
                 else:
-                    print(f"Filling buffer: {len(replay_buffer)}")
+                    log.debug(f"Filling buffer: {len(replay_buffer)}")
             learn(vfuns, experience)
             if i % 1 == 0:
                 reward_sum = sum(x.reward for x in experience)
-                print(f"{i}: reward sum {reward_sum}")
-                plot_o0.update({a: vfun.predict([0]*100000, dropout=True) for a, vfun in enumerate(vfuns)})
-                plot_o4.update({a: vfun.predict([4]*100000, dropout=True) for a, vfun in enumerate(vfuns)})
+                log.info(f"{i}: reward sum {reward_sum}")
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    # Print all logs. In color.
+    coloredlogs.install(
+            level='DEBUG',
+            fmt='%(asctime)s %(name)s %(levelname)s %(message)s',
+            )
+    # End of setup
     run()
+
+
+def main_werror():
+    # Throw exceptions for warnings.
+    warnings.filterwarnings("error")
+    main()
 
 
 if __name__ == '__main__':
