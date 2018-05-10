@@ -80,14 +80,12 @@ def run():
     vfuns = [create_vfun() for _ in range(env.action_space.n)]
 
     with InitializedTFSession() as sess:
-        for i in range(10000):
-            while True:
-                experience = [*rollout(env, policy_thompson(vfuns))]
-                replay_buffer.extend(experience)
-                if not replay_buffer.seeded:
-                    log.debug(f"Filling buffer: {len(replay_buffer)}")
-                    continue
-                break
+        while True:
+            experience = [*rollout(env, policy_thompson(vfuns))]
+            replay_buffer.extend(experience)
+            if not replay_buffer.seeded:
+                log.debug(f"Filling buffer: {len(replay_buffer)}")
+                continue
             learn(vfuns, replay_buffer.sample(10000))
 
 
