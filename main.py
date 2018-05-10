@@ -128,10 +128,10 @@ def run():
             while True:
                 experience = [*rollout(env, policy_thompson(vfuns))]
                 replay_buffer.extend(experience)
-                if replay_buffer.seeded:
-                    break
-                else:
+                if not replay_buffer.seeded:
                     log.debug(f"Filling buffer: {len(replay_buffer)}")
+                    continue
+                break
             learn(vfuns, replay_buffer.sample(10000))
             if i % 1 == 0:
                 reward_sum = sum(x.reward for x in experience)
