@@ -26,50 +26,6 @@ def policy_thompson(vfuns):
     return _
 
 
-def continous_rollout(env, output):
-    assert False
-    terminated = True
-    while True:
-        if terminated:
-            observation = env.reset()
-        action = yield observation
-        new_observation, reward, terminated, _ = env.step(action)
-        output((observation, action, reward, new_observation))
-        observation = new_observation
-
-
-def bundle_envrolls(envrolls):
-    assert False
-    actions = [None] * len(envrolls)
-    while True:
-        observations = [e.send(a) for e,a in zip(envrolls, actions)]
-        actions = yield observations
-
-
-class InteractionEngine:
-    def __init__(self, create_env, policy):
-        assert False
-        self.policy = policy
-        self._env_bundle = bundle_envrolls([create_env() for _ in range(1000)])
-
-    def generate_experience(self):
-        observations = next(self._env_bundle)
-        observations = self._env_bundle.send(policy(observations))
-        yield from asd
-
-
-def rollout_engine(policy):
-    assert False
-    while True:
-        new_policy = yield experience
-        if new_policy is not None:
-            policy = new_policy
-            continue
-
-        experience = []
-        rollout(env, experience.append)
-
-
 def learn(vfuns, experience):
     observations = [[] for _ in vfuns]
     rewards = [[] for _ in vfuns]
