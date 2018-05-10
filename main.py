@@ -133,9 +133,6 @@ def run():
                     continue
                 break
             learn(vfuns, replay_buffer.sample(10000))
-            if i % 1 == 0:
-                reward_sum = sum(x.reward for x in experience)
-                log.info(f"{i}: reward sum {reward_sum}")
 
 
 def main():
