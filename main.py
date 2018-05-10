@@ -3,7 +3,6 @@ import tensorflow as tf
 import collections
 import logging
 import contextlib
-import warnings
 import coloredlogs
 import itertools
 
@@ -97,12 +96,6 @@ def main():
             )
     # End of setup
     run()
-
-
-def main_werror():
-    # Throw exceptions for warnings.
-    warnings.filterwarnings("error")
-    main()
 
 
 if __name__ == '__main__':
