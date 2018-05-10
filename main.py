@@ -1,13 +1,11 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 import collections
 import logging
 import contextlib
 import warnings
-import collections
 import coloredlogs
+import itertools
 
 import envs
 import approximators
@@ -98,28 +96,6 @@ def learn(vfuns, experience):
         # Note: The learning rate is set in AdamOptimizer used in approximators.py
 
 
-class DistributionPlot:
-    def __init__(self, title):
-        self.title = title
-        self.fig = plt.figure()
-        self.fig.show()
-        plt.pause(0.0001)
-
-    def update(self, data):
-        """
-        Args:
-            data: {label: [value]}, label: str, value: num
-        """
-        df = pd.DataFrame(data)
-
-        ax = self.fig.gca()
-        ax.clear()
-        ax.set_title(self.title)
-        df.plot.hist(ax=ax, histtype='step', density=True, bins=100, alpha=0.8)
-        self.fig.tight_layout()
-        plt.pause(0.0001)
-
-
 @contextlib.contextmanager
 def InitializedTFSession():
     """
@@ -130,34 +106,6 @@ def InitializedTFSession():
         log.debug("Starting new tf-session with graph variables reset.")
         sess.run(tf.global_variables_initializer())
         yield sess
-
-
-class MultiheadDQN:
-    """
-    Multihead DQN on default tf-graph. Should be instantiated before starting a
-    tf-session. The observations are categorical/discrete.
-    """
-    def __init__(self):
-        assert False
-        self._observations = tf.placeholder(tf.float32, shape=[None])
-        self._dropout_enabled = tf.placeholder(tf.bool)
-        head = self._observations
-        # Network from double-uncertain paper. Separate network for each
-        # action. Three dense relu layers of 128. Dropout with p-keep=75%
-        # enabled during prediction.
-        head = tf.reshape(head, [-1, 1])
-        for _ in range(3):
-            head = tf.layers.dense(head, 128)
-            # Parameter `training` determines if dropout is enabled.
-            head = tf.layers.dropout(head, rate=0.25, training=self._dropout_enabled)
-        head = tf.layers.dense(head, 1)
-        head = tf.reshape(head, [-1])
-        self._value_predictions = head
-
-        self._value_targets = tf.placeholder(tf.float32, shape=[None])
-        self._learn_op = tf.train.AdamOptimizer().minimize(
-            tf.losses.mean_squared_error(self._value_targets, self._value_predictions)
-            )
 
 
 def rollout(env, policy):
@@ -184,7 +132,7 @@ def run():
                     break
                 else:
                     log.debug(f"Filling buffer: {len(replay_buffer)}")
-            learn(vfuns, experience)
+            learn(vfuns, replay_buffer.sample(10000))
             if i % 1 == 0:
                 reward_sum = sum(x.reward for x in experience)
                 log.info(f"{i}: reward sum {reward_sum}")
