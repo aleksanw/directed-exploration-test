@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 def policy_thompson(vfuns):
     def _(observations):
-        return np.argmax([v.predict(observations, dropout=True) for v in vfuns], axis=-1)
+        return np.argmax([v.predict_reward(observations, dropout=True) for v in vfuns], axis=-1)
     return _
 
 
@@ -46,7 +46,7 @@ def learn(vfuns, experience):
 
         # Learn a TD0 step
         td_discount = 1
-        next_predictions = action_vfun.predict(next_observations, dropout=False)
+        next_predictions = action_vfun.predict_reward(next_observations, dropout=False)
         td_targets = rewards + td_discount * next_predictions
         action_vfun.learn(observations, td_targets)
         # Note: The learning rate is set in AdamOptimizer used in approximators.py
@@ -85,8 +85,8 @@ def run():
                     "Action-reward (discounted) distribution in state 0",
                     "Reward",
                     {
-                        "Action 0": [vfuns[0].predict([0]*10000, dropout=True)],
-                        "Action 1": [vfuns[1].predict([0]*10000, dropout=True)],
+                        "Action 0": [vfuns[0].predict_reward([0]*10000, dropout=True)],
+                        "Action 1": [vfuns[1].predict_reward([0]*10000, dropout=True)],
                     },
                     )
             fig.savefig(f"imgs/state0-{i}.png")

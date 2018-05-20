@@ -38,7 +38,7 @@ class MyApproximator:
             self._dropout_enabled: True,
             })
 
-    def predict(self, observations, dropout=False):
+    def predict_reward(self, observations, dropout=False):
         # Must be called in a TF-session context.
         return self._value_predictions.eval(feed_dict={
             self._observations: observations,
