@@ -82,7 +82,7 @@ def run():
     with InitializedTFSession() as sess:
         for i in itertools.count():
             fig = plot.distribution(
-                    "Action-reward distribution in state 0",
+                    "Action-reward (discounted) distribution in state 0",
                     "Reward",
                     {
                         "Action 0": [vfuns[0].predict([0]*10000, dropout=True)],
