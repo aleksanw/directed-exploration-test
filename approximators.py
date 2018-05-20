@@ -14,7 +14,9 @@ class MyApproximator:
         # enabled during prediction.
         head = tf.reshape(head, [-1, 1])
         for _ in range(3):
-            head = tf.layers.dense(head, 128)
+            head = tf.layers.dense(head, 128,
+                    bias_initializer=tf.glorot_uniform_initializer(),
+                    )
             # Parameter `training` determines if dropout is enabled.
             head = tf.layers.dropout(head, rate=0.25, training=self._dropout_enabled)
         head = tf.layers.dense(head, 1)
