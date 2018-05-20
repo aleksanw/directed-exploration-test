@@ -8,7 +8,7 @@ def distribution(title, xlabel, data):
     ax = fig.gca(
             title=title,
             xlabel=xlabel,
-            ylabel="Projability density"
+            ylabel="Probability density"
             )
     for series_label, series_data in data.items():
         # Plot a filled kernel density estimate
