@@ -6,6 +6,7 @@ import contextlib
 import coloredlogs
 import itertools
 
+import plot
 import envs
 import approximators
 from replay_buffer import ReplayBuffer
@@ -79,7 +80,17 @@ def run():
     vfuns = [create_vfun() for _ in range(env.action_space.n)]
 
     with InitializedTFSession() as sess:
-        while True:
+        for i in itertools.count():
+            fig = plot.distribution(
+                    "Action-reward distribution in state 0",
+                    "Reward",
+                    {
+                        "Action 0": [vfuns[0].predict([0]*10000, dropout=True)],
+                        "Action 1": [vfuns[1].predict([0]*10000, dropout=True)],
+                    },
+                    )
+            fig.savefig(f"imgs/state0-{i}.png")
+
             experience = [*rollout(env, policy_thompson(vfuns))]
             replay_buffer.extend(experience)
             if not replay_buffer.seeded:
