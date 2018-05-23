@@ -5,6 +5,7 @@ import logging
 import contextlib
 import coloredlogs
 import itertools
+import os
 
 import plot
 import envs
@@ -105,6 +106,7 @@ def main():
             level='DEBUG',
             fmt='%(asctime)s %(name)s %(levelname)s %(message)s',
             )
+    os.makedirs('imgs', exist_ok=True)
     # End of setup
     run()
 
