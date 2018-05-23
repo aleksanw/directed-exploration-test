@@ -82,7 +82,8 @@ def run():
 
     with InitializedTFSession() as sess:
         for i in itertools.count():
-            fig = plot.distribution(
+            plot.distribution(
+                    f"imgs/state0-{i}.png",
                     "Action-reward (discounted) distribution in state 0",
                     "Reward",
                     {
@@ -90,7 +91,6 @@ def run():
                         "Action 1": [vfuns[1].predict_reward([0]*10000, dropout=True)],
                     },
                     )
-            fig.savefig(f"imgs/state0-{i}.png")
 
             experience = [*rollout(env, policy_thompson(vfuns))]
             replay_buffer.extend(experience)
