@@ -2,12 +2,12 @@ import numpy as np
 import tensorflow as tf
 import collections
 import logging
-import contextlib
 import coloredlogs
 import itertools
 import os
 from pprint import pformat
 
+import tensor_wrapper as tw
 import policy_thompson
 import plot
 import envs
@@ -50,18 +50,6 @@ def learn(vfuns, experience):
         # Note: The learning rate is set in AdamOptimizer used in approximators.py
 
 
-@contextlib.contextmanager
-def InitializedTFSession():
-    """
-    Context for a tensorflow session that is initalized and installed as
-    default.
-    """
-    with tf.Session() as sess, sess.as_default():
-        log.debug("Starting new tf-session with graph variables reset.")
-        sess.run(tf.global_variables_initializer())
-        yield sess
-
-
 def rollout(env, policy):
     observation = env.reset()
     terminated = False
@@ -77,7 +65,7 @@ def run():
     replay_buffer = ReplayBuffer(30000)
     vfuns = [create_vfun() for _ in range(env.action_space.n)]
 
-    with InitializedTFSession() as sess:
+    with tw.InitializedSession() as sess:
         for i in itertools.count():
             plot.distribution(
                     f"imgs/state0-{i}.png",
