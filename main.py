@@ -62,7 +62,7 @@ def rollout(env, policy):
 
 def run():
     env = create_env()
-    replay_buffer = ReplayBuffer(30000)
+    replay_buffer = ReplayBuffer(10000)
     vfuns = [create_vfun() for _ in range(env.action_space.n)]
 
     with tw.InitializedSession() as sess:
