@@ -11,6 +11,8 @@ def distribution(path, title, xlabel, data):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Probability density")
+    ax.set_ylim([0,3])
+    ax.set_xlim([-10,10])
 
     for series_label, series_data in data.items():
         # Plot a filled kernel density estimate
