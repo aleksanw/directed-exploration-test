@@ -6,7 +6,9 @@ import contextlib
 import coloredlogs
 import itertools
 import os
+from pprint import pformat
 
+import policy_thompson
 import plot
 import envs
 import approximators
@@ -20,11 +22,6 @@ create_env = envs.nchain_nonslip
 create_vfun = approximators.MyApproximator
 
 log = logging.getLogger(__name__)
-
-def policy_thompson(vfuns):
-    def _(observations):
-        return np.argmax([v.predict_reward(observations, dropout=True) for v in vfuns], axis=-1)
-    return _
 
 
 def learn(vfuns, experience):
@@ -92,7 +89,8 @@ def run():
                     },
                     )
 
-            experience = [*rollout(env, policy_thompson(vfuns))]
+            experience = [*rollout(env, policy_thompson.create([lambda x: v.predict_reward(x, dropout=True) for v in vfuns]))]
+            log.debug(f"Experience gained: {pformat(experience)}")
             replay_buffer.extend(experience)
             if not replay_buffer.seeded:
                 log.debug(f"Filling buffer: {len(replay_buffer)}")
