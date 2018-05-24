@@ -25,27 +25,31 @@ log = logging.getLogger(__name__)
 
 
 def learn(vfuns, experience):
-    observations = [[] for _ in vfuns]
-    rewards = [[] for _ in vfuns]
-    next_observations = [[] for _ in vfuns]
+    a_observations = [[] for _ in vfuns]
+    a_rewards = [[] for _ in vfuns]
+    a_next_observations = [[] for _ in vfuns]
 
     # Bucketize experience on action
     for o,action,r,p in experience:
-        observations[action].append(o)
-        rewards[action].append(r)
-        next_observations[action].append(p)
+        a_observations[action].append(o)
+        a_rewards[action].append(r)
+        a_next_observations[action].append(p)
+
 
     # Each action has its own estimator, train each separatly
     for action, action_vfun in enumerate(vfuns):
         # Convert to numpy arrays
-        observations = np.array(observations[action], ndmin=1)
-        rewards = np.array(rewards[action], ndmin=1)
-        next_observations = np.array(next_observations[action], ndmin=1)
+        observations = np.array(a_observations[action])
+        rewards = np.array(a_rewards[action])
+        next_observations = np.array(a_next_observations[action])
+
+        log.debug(f"action {action}: count {len(rewards)}; rewsum: {sum(rewards)}")
 
         # Learn a TD0 step
         td_discount = 1
         next_predictions = action_vfun.predict_reward(next_observations, dropout=False)
         td_targets = rewards + td_discount * next_predictions
+        log.debug(f"TD debug: {pformat([*zip(rewards[:10], next_predictions[:10], td_targets[:10])])}")
         action_vfun.learn(observations, td_targets)
         # Note: The learning rate is set in AdamOptimizer used in approximators.py
 
@@ -78,7 +82,7 @@ def run():
                     )
 
             experience = [*rollout(env, policy_thompson.create([lambda x: v.predict_reward(x, dropout=True) for v in vfuns]))]
-            log.debug(f"Experience gained: {pformat(experience)}")
+            #log.debug(f"Experience gained: {pformat(experience)}")
             replay_buffer.extend(experience)
             if not replay_buffer.seeded:
                 log.debug(f"Filling buffer: {len(replay_buffer)}")
